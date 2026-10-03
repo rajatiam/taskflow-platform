@@ -1,0 +1,17 @@
+{
+  "name": "Team Taskboard",
+  "skills": "Full-stack product development, REST, SQLite, filtering",
+  "entity": "task",
+  "fields": [
+    "title",
+    "owner",
+    "status"
+  ],
+  "example": {
+    "title": "Ship onboarding",
+    "owner": "Rajat",
+    "status": "todo"
+  },
+  "kind": "taskboard",
+  "port": 8101
+}
