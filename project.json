@@ -13,5 +13,17 @@
     "status": "todo"
   },
   "kind": "taskboard",
-  "port": 8101
+  "port": 8101,
+  "description": "Organize team work with a live Kanban board and clear ownership.",
+  "accent": "#0d9488",
+  "stack": [
+    "Python",
+    "FastAPI",
+    "Angular",
+    "TypeScript",
+    "SQLite",
+    "Docker",
+    "Kubernetes",
+    "GitHub Actions"
+  ]
 }

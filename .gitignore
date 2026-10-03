@@ -3,3 +3,7 @@ __pycache__/
 data/
 .env
 .venv/
+node_modules/
+frontend/dist/
+frontend/.angular/
+coverage/

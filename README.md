@@ -1,48 +1,98 @@
-# Team Taskboard
+# Team Taskboard â€” Python + Angular
 
-Full-stack product development, REST, SQLite, filtering.
+Organize team work with a live Kanban board and clear ownership.
+
+**Stack:** Python 3.11+, FastAPI, Uvicorn, Angular 21, TypeScript, RxJS, reactive forms, SQLite, Docker, Kubernetes, GitHub Actions.
+
+## Screenshots
+
+![Desktop Angular dashboard](docs/desktop.png)
+
+[View the mobile dashboard](docs/mobile.png).
 
 ## Run locally
 
-Requires Python 3.11 or newer. No packages, accounts, API keys, or paid services required.
+Requires Python 3.11+ and Node.js 20.19+, 22.12+, or 24+. First-time package installation needs internet access. No cloud account or API key is needed.
 
 ```sh
-python app.py
+python -m venv .venv
+# Windows PowerShell:
+.venv/Scripts/Activate.ps1
+# macOS/Linux instead: source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+cd frontend
+npm ci
+npm run build
+cd ..
+python run.py
 ```
 
-Open http://127.0.0.1:8101. Create the prefilled example to begin. Records persist in `data/app.db`.
+Open **http://127.0.0.1:8101**. FastAPI serves the compiled Angular app and API on one origin. API documentation: http://127.0.0.1:8101/docs.
+
+### Development with live reload
+
+Terminal 1: activate the Python environment and run `python run.py` from this repository.
+
+Terminal 2:
 
 ```sh
-python -m unittest -v
+cd frontend
+npm start
+```
+
+Open http://127.0.0.1:4201. Angular's proxy sends API requests to the Python backend. If you override `PORT`, update `frontend/proxy.conf.json` too.
+
+### Docker
+
+```sh
 docker compose up --build
 docker compose down
 ```
 
-Docker is optional. Its named volume preserves data. `docker compose down --volumes` removes that data.
+The multi-stage Docker build compiles Angular, installs Python dependencies, and runs as a non-root user. Compose binds to loopback and preserves SQLite in a named volume. `docker compose down --volumes` intentionally deletes that data.
 
-## Demonstration
+## Features
 
-Create tasks and advance todo → doing → done. Search by owner or status.
+Create tasks, assign owners, and advance todo â†’ doing â†’ done. The Angular UI renders a three-column Kanban board.
+
+- Responsive Angular dashboard with typed HttpClient service and standalone components.
+- Signal-driven UI, reactive forms, debounced search, and cancellable search requests.
+- Workspace, analytics, architecture views; inspect JSON and confirm deletion.
+- API validation and persisted domain-specific workflows.
+- Health and Prometheus-format metric endpoints; generated OpenAPI documentation.
 
 ## Architecture
 
-Browser (HTML/CSS/JavaScript) → Python HTTP + REST → domain rules → SQLite.
-`app.py` handles transport/storage; `domain.py` implements validation and business rules; `static/` contains the responsive UI.
-Writes are serialized within one process. SQLite transactions prevent partial writes. This starter intentionally uses Python's standard library so every repo runs offline after checkout.
+```mermaid
+flowchart LR
+  A[Angular browser UI] --> B[FastAPI REST endpoints]
+  B --> C[Domain rules]
+  C --> D[(SQLite)]
+```
+
+| File | Responsibility |
+| --- | --- |
+| `frontend/src/app/app.component.*` | Signals, reactive forms, domain-specific dashboards |
+| `frontend/src/app/api.service.ts` | Typed HTTP operations and analytics loading |
+| `api.py` | FastAPI routing, errors, health, worker lifecycle, built frontend |
+| `app.py` | Persistence and domain orchestration |
+| `domain.py` | Validation, workflow rules, analytics |
+| `project.json` | Project-specific schema and presentation |
 
 ## API
 
 | Endpoint | Behavior |
 | --- | --- |
-| GET /health | Health probe |
-| GET /api/config | Form schema |
+| GET /health | Database health probe |
+| GET /metrics | Stored-record gauge |
+| GET /api/config | Project form schema |
 | GET /api/records?q=text | List and search |
 | POST /api/records | Validate and create JSON record |
 | DELETE /api/records/id | Delete record |
-| GET /api/summary | Domain metrics |
-| POST /api/records/id/action | Applicable workflow action, JSON body `{}` |
+| GET /api/summary?q=text | Domain metrics |
+| POST /api/records/id/action | Domain workflow action |
 
-Example payload:
+Example create payload:
 
 ```json
 {
@@ -52,15 +102,24 @@ Example payload:
 }
 ```
 
-## DevOps and deployment
+## Validation
 
-Docker uses a non-root user; Compose provides persistent storage and health checks. GitHub Actions tests the API and business rules and builds the image. `deploy/kubernetes.yaml` demonstrates a single-replica Deployment, Service, persistent volume claim, resource limits, and health probes. Build/tag/push your image and replace `image: 01-team-taskboard:local` before deploying to a cluster; for local kind/minikube, load the image into the cluster first. The cluster needs a default storage class.
+Local verification completed: seven Python tests, strict production Angular compilation, and browser checks for creation, workflows, filtering, analytics, mobile layout, and deletion. Screenshot fixtures use a disposable database. Docker Compose configuration validation passed; container execution is checked by GitHub CI.
 
-`HOST`, `PORT`, and `DATABASE_PATH` customize the server. Bind to loopback for the local demo. These apps have no authentication, TLS, or tenant isolation; add those and replace the standard-library HTTP server before exposing them publicly. Kubernetes examples are templates, not verified cloud deployments. Releases, cost, and policy projects use local data as explained above.
+```sh
+python -m unittest -v
+cd frontend
+npm run build
+```
 
-## Portfolio talking points
+Tests exercise HTTP errors, persistence, domain rules, OpenAPI, and metrics. Production Angular builds enforce strict TypeScript and template checks. CI runs these checks and builds the container image.
 
-- Explain a business invariant and show its test.
-- Trace a browser action through API validation to persistence.
-- Show CI, image build, health checks, resource sizing, and recovery behavior.
-- Discuss how you would add authentication, migrations, PostgreSQL, and a managed cloud deployment.
+## Deployment and scope
+
+`deploy/kubernetes.yaml` provides a single-replica Deployment, Service, PVC, health probes, resource requests/limits, and a non-root security context. Build/tag/push an image and replace `01-team-taskboard:local` before cluster deployment. A default storage class is required. Templates are provided; no live cloud deployment is claimed.
+
+`HOST`, `PORT`, and `DATABASE_PATH` customize the backend. Run a single process: write locking and the background job runner are process-local. This demo has no authentication, TLS, or tenant isolation; add those before public hosting. Cost, policy, and release projects operate on local data, as explained above. The shared application foundation intentionally keeps each independently runnable project small while its domain rules and UI demonstrate different skills.
+
+## Skills to discuss
+
+Full-stack product development, REST, SQLite, filtering. Demonstrate a browser action, trace its API request and database write, show an invariant test, and explain how you would add PostgreSQL migrations, authentication, and managed cloud infrastructure.

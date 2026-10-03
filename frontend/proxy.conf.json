@@ -1,0 +1,14 @@
+{
+  "/api/**": {
+    "target": "http://127.0.0.1:8101",
+    "secure": false
+  },
+  "/health": {
+    "target": "http://127.0.0.1:8101",
+    "secure": false
+  },
+  "/metrics": {
+    "target": "http://127.0.0.1:8101",
+    "secure": false
+  }
+}
