@@ -1,7 +1,9 @@
-"""Start the backend and built Angular frontend on this project's port."""
-import os
+import logging
 import uvicorn
+from backend.configuration import settings
 from app import CONFIG
 
-if __name__ == '__main__':
-    uvicorn.run('api:app', host=os.environ.get('HOST','127.0.0.1'), port=int(os.environ.get('PORT',CONFIG['port'])))
+if __name__=='__main__':
+    logging.basicConfig(level=logging.INFO,format='%(message)s')
+    config=settings(CONFIG)
+    uvicorn.run('backend.api:app',host=config.host,port=config.port)

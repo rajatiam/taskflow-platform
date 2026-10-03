@@ -1,3 +1,6 @@
+import { AuthService } from './auth.service';
+import { AuthPanelComponent } from './auth-panel.component';
+import { AuditPanelComponent, MembersPanelComponent } from './admin-panels.component';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -10,11 +13,14 @@ import { Field, ProjectConfig, RecordItem, Value } from './models';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AuthPanelComponent, AuditPanelComponent, MembersPanelComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit {
   private readonly api = inject(ApiService);
+  readonly auth = inject(AuthService);
+  private workspaceStarted = false;
+  logout() { this.auth.logout().subscribe({error:error=>this.fail(error)}); }
   private readonly destroy = inject(DestroyRef);
   private readonly searchEvents = new Subject<string>();
   readonly config = signal<ProjectConfig | null>(null);
@@ -24,7 +30,7 @@ export class AppComponent implements OnInit {
   readonly notice = signal('');
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly tab = signal<'workspace' | 'analytics' | 'architecture'>('workspace');
+  readonly tab = signal<'workspace' | 'analytics' | 'architecture' | 'audit' | 'members'>('workspace');
   readonly pendingDelete = signal<number | null>(null);
   readonly selected = signal<RecordItem | null>(null);
   readonly query = signal('');
@@ -34,6 +40,12 @@ export class AppComponent implements OnInit {
   form = new FormGroup<Record<string, FormControl<Value>>>({});
 
   ngOnInit() {
+    this.auth.restore().subscribe({next:user => { if(user) this.initializeWorkspace(); },error:error=>this.fail(error)});
+  }
+
+  initializeWorkspace() {
+    if (this.workspaceStarted) { this.refresh(); return; }
+    this.workspaceStarted = true;
     this.api.config().pipe(takeUntilDestroyed(this.destroy)).subscribe({
       next: config => {
         this.config.set(config); document.title = config.name;
@@ -82,12 +94,16 @@ export class AppComponent implements OnInit {
     this.saving.set(true); this.error.set('');
     this.api.delete(id).pipe(takeUntilDestroyed(this.destroy)).subscribe({ next: () => { this.saving.set(false); this.pendingDelete.set(null); this.notice.set('Record deleted.'); this.refresh(); }, error: error => this.fail(error) });
   }
-  private fail(error: HttpErrorResponse) { this.error.set(error.error?.error ?? error.error?.detail ?? error.message ?? 'Request failed'); this.loading.set(false); this.saving.set(false); }
+  private fail(error: HttpErrorResponse) { this.error.set(error.status === 409 ? 'This record changed in another session. Refresh the workspace and retry.' : error.error?.error ?? error.message ?? 'Request failed'); this.loading.set(false); this.saving.set(false); }
   text(row: RecordItem, key: string) { return String(row[key] ?? '—'); }
   number(row: RecordItem, key: string) { return Number(row[key] ?? 0); }
   truth(row: RecordItem, key: string) { return row[key] === true; }
   column(status: string) { return this.rows().filter(row => row['status'] === status); }
   actions(row: RecordItem): string[] {
+    if(!this.auth.canWrite()) return [];
+    return this.domainActions(row).filter(action => action !== 'approve' || this.auth.isAdmin());
+  }
+  private domainActions(row: RecordItem): string[] {
     switch (this.config()?.kind) {
       case 'taskboard': return row['status'] === 'done' ? [] : ['advance'];
       case 'support': return row['status'] === 'resolved' ? [] : ['advance'];

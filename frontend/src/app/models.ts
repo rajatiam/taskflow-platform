@@ -1,6 +1,8 @@
 export type Value = string | number | boolean | null | string[];
 export interface RecordItem {
   id: number;
+  version: number;
+  created_at: string;
   [key: string]: unknown;
 }
 export interface ProjectConfig {

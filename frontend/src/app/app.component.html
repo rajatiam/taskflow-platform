@@ -1,3 +1,4 @@
+@if (!auth.user()) { <app-auth-panel (authenticated)="initializeWorkspace()" /> } @else {
 @if (config(); as config) {
 <div class="shell" [style.--accent]="config.accent">
   <aside class="sidebar">
@@ -7,18 +8,19 @@
       <button [class.active]="tab() === 'workspace'" (click)="tab.set('workspace')">Workspace</button>
       <button [class.active]="tab() === 'analytics'" (click)="tab.set('analytics')">Analytics</button>
       <button [class.active]="tab() === 'architecture'" (click)="tab.set('architecture')">Architecture</button>
+    @if (auth.isAdmin()) { <button [class.active]="tab() === 'audit'" (click)="tab.set('audit')">Audit history</button><button [class.active]="tab() === 'members'" (click)="tab.set('members')">Access control</button> }
     </nav>
     <div class="sidebar-footer"><span class="status-dot"></span> LOCAL DEVELOPMENT<br><small>FastAPI · SQLite · Docker</small></div>
   </aside>
   <main>
-    <header><div><p class="eyebrow">{{ config.entity }} OPERATIONS</p><h1>{{ config.name }}</h1><p class="muted">{{ config.description }}</p></div><a class="api-link" [href]="'http://127.0.0.1:' + config.port + '/docs'" target="_blank" rel="noopener">API docs ↗</a></header>
+    <header><div><p class="eyebrow">{{ config.entity }} OPERATIONS</p><h1>{{ config.name }}</h1><p class="muted">{{ config.description }}</p></div><div class="identity-bar"><span class="identity-name">{{ auth.user()?.username }}</span><span class="badge">{{ auth.user()?.role }}</span><button (click)="logout()">Sign out</button><a class="api-link" [href]="'http://127.0.0.1:' + config.port + '/docs'" target="_blank" rel="noopener">API docs ↗</a></div></header>
     @if (error()) { <div class="alert error" role="alert">{{ error() }} <button (click)="error.set('')" aria-label="Dismiss error">×</button></div> }
     @if (notice()) { <div class="alert success" role="status">{{ notice() }} <button (click)="notice.set('')" aria-label="Dismiss notice">×</button></div> }
     <div class="metrics">@for (metric of metrics(); track metric.label) { <article class="metric"><span>{{ metric.label }}</span><strong>{{ metric.value | number:'1.0-2' }}</strong></article> } @empty { <article class="metric"><span>Records</span><strong>{{ rows().length }}</strong></article> }</div>
     @if (tab() === 'workspace') {
       <div class="workspace">
         <section class="panel create-panel"><div class="panel-heading"><h2>New {{ config.entity }}</h2><span class="pill">CREATE</span></div>
-          <form [formGroup]="form" (ngSubmit)="create()">
+          @if (auth.canWrite()) { <form [formGroup]="form" (ngSubmit)="create()">
             @for (field of fields(); track field.key) {
               <label [for]="field.key">{{ field.label }}</label>
               @switch (field.type) {
@@ -29,14 +31,14 @@
               @if (form.controls[field.key].invalid && form.controls[field.key].touched) { <small class="validation">Enter a valid {{ field.label }}.</small> }
             }
             <button class="primary" type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Create ' + config.entity }}</button>
-          </form><p class="form-note">Changes persist in your local SQLite database.</p>
+          </form> } @else { <p class="reader-note">Your viewer role allows browsing. Ask an administrator for editor access to make changes.</p> }<p class="form-note">Changes persist in your local SQLite database.</p>
         </section>
         <section class="panel record-panel"><div class="panel-heading"><h2>Live workspace <span class="count">{{ rows().length }}</span></h2><button class="ghost" (click)="refresh()" [disabled]="loading()">Refresh</button></div>
           <label class="search-label" for="search">Search workspace</label><input id="search" class="search" #searchInput placeholder="Search records, owners, status…" [value]="query()" (input)="search(searchInput.value)">
           @if (loading()) { <p role="status" class="muted">Loading workspace…</p> }
           @if (!loading() && !rows().length) { <div class="empty"><span>+</span><h3>Your workspace is ready</h3><p>Create the prefilled example to see this project in action.</p></div> }
           @if (config.kind === 'taskboard' && rows().length) {
-            <div class="kanban">@for (status of columns; track status) { <section class="column"><h3>{{ status }} <span>{{ column(status).length }}</span></h3>@for (row of column(status); track row.id) { <article class="task"><strong>{{ text(row,'title') }}</strong><p>{{ text(row,'owner') }}</p><div class="actions">@for (actionName of actions(row); track actionName) { <button (click)="action(row,actionName)" [disabled]="saving()">{{ actionName }}</button> }<button class="danger" (click)="pendingDelete.set(row.id)">Delete</button></div></article> }</section> }</div>
+            <div class="kanban">@for (status of columns; track status) { <section class="column"><h3>{{ status }} <span>{{ column(status).length }}</span></h3>@for (row of column(status); track row.id) { <article class="task"><strong>{{ text(row,'title') }}</strong><p>{{ text(row,'owner') }}</p><div class="actions">@for (actionName of actions(row); track actionName) { <button (click)="action(row,actionName)" [disabled]="saving()">{{ actionName }}</button> }<button class="danger" [disabled]="!auth.canWrite()" (click)="pendingDelete.set(row.id)">Delete</button></div></article> }</section> }</div>
           } @else {
             <div class="record-list">@for (row of rows(); track row.id) { <article class="record" [class.flagged]="config.kind === 'policy' && policyViolations(row).length">
               <div class="record-title"><h3>{{ label(row) }}</h3><span class="record-id">#{{ row.id }}</span></div>
@@ -52,17 +54,21 @@ Result: {{ text(row,'result') }}</pre>@if (row['error']) { <p class="validation"
                 @case ('cost') { <div class="stock"><strong>{{ number(row,'hourly_cost') * number(row,'monthly_hours') | currency:'USD' }}</strong><span>/ month estimate</span></div><p class="muted">{{ text(row,'team') }} · {{ text(row,'monthly_hours') }} hours at {{ number(row,'hourly_cost') | currency:'USD':'symbol':'1.2-4' }}/hour</p><span class="badge" [class.warning]="number(row,'hourly_cost') * number(row,'monthly_hours') > number(row,'budget')">Budget: {{ number(row,'budget') | currency:'USD' }}</span> }
                 @case ('policy') { <div class="badges"><span class="badge" [class.warning]="truth(row,'public')">{{ truth(row,'public') ? 'Public' : 'Private' }}</span><span class="badge" [class.warning]="!truth(row,'encrypted')">{{ truth(row,'encrypted') ? 'Encrypted' : 'Unencrypted' }}</span><span class="badge" [class.warning]="!truth(row,'backup')">{{ truth(row,'backup') ? 'Backups on' : 'Backups off' }}</span></div>@for (finding of policyViolations(row); track finding) { <p class="validation">⚠ {{ finding }}</p> }@if (!policyViolations(row).length) { <p class="compliant">All policies passed</p> } }
               }
-              <div class="actions">@for (actionName of actions(row); track actionName) { <button (click)="action(row,actionName)" [disabled]="saving()">{{ actionName }}</button> }<button (click)="selected.set(row)">Inspect JSON</button><button class="danger" (click)="pendingDelete.set(row.id)">Delete</button></div>
+              <div class="actions">@for (actionName of actions(row); track actionName) { <button (click)="action(row,actionName)" [disabled]="saving()">{{ actionName }}</button> }<button (click)="selected.set(row)">Inspect JSON</button><button class="danger" [disabled]="!auth.canWrite()" (click)="pendingDelete.set(row.id)">Delete</button></div>
             </article> }</div>
           }
         </section>
       </div>
     }
     @if (tab() === 'analytics') { <section class="panel"><h2>Operational analytics</h2><p class="muted">Metrics reflect the current search filter and persisted workspace.</p><pre class="output">{{ stats() | json }}</pre></section> }
-    @if (tab() === 'architecture') { <section class="panel architecture"><h2>How this project works</h2><div class="flow"><span>Angular UI</span>→<span>FastAPI</span>→<span>Domain rules</span>→<span>SQLite</span></div><h3>Skills demonstrated</h3><p>{{ config.skills }}</p><h3>Local infrastructure</h3><p>Docker multi-stage builds compile Angular and package the Python backend. CI runs Python tests, compiles Angular, and builds the image. Kubernetes templates include persistent storage, health probes, and resource limits.</p><h3>Demo scope</h3><p>This local portfolio app uses one backend process. Cloud cost, policy, and release tools use local data. Add authentication and TLS before exposing it publicly.</p></section> }
+    @if (tab() === 'architecture') { <section class="panel architecture"><h2>How this project works</h2><div class="flow"><span>Angular UI</span>→<span>FastAPI</span>→<span>Domain rules</span>→<span>SQLite</span></div><h3>Skills demonstrated</h3><p>{{ config.skills }}</p><h3>Local infrastructure</h3><p>Docker multi-stage builds compile Angular and package the Python backend. CI runs Python tests, compiles Angular, and builds the image. Kubernetes templates include persistent storage, health probes, and resource limits.</p><h3>Demo scope</h3><p>This local portfolio reference app uses one backend process. Cloud cost, policy, and release tools use local data. Sessions and role checks protect mutations. Configure TLS and production settings before public hosting.</p></section> }
+    @if (tab() === 'audit' && auth.isAdmin()) { <app-audit-panel /> }
+    @if (tab() === 'members' && auth.isAdmin()) { <app-members-panel /> }
     <footer>Built with Angular + FastAPI <span>Persistent local workspace</span></footer>
   </main>
 </div>
-@if (pendingDelete(); as id) { <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title"><h2 id="delete-title">Delete record #{{ id }}?</h2><p>This removes it from the local database.</p><div class="actions"><button (click)="pendingDelete.set(null)">Cancel</button><button class="danger" [disabled]="saving()" (click)="remove(id)">Confirm delete</button></div></section></div> }
+@if (pendingDelete(); as id) { <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title"><h2 id="delete-title">Delete record #{{ id }}?</h2><p>This archives it from the active workspace. Audit history is retained.</p><div class="actions"><button (click)="pendingDelete.set(null)">Cancel</button><button class="danger" [disabled]="saving()" (click)="remove(id)">Confirm delete</button></div></section></div> }
 @if (selected(); as row) { <div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="json-title"><h2 id="json-title">Record details</h2><pre class="output">{{ row | json }}</pre><button (click)="selected.set(null)">Close</button></section></div> }
 } @else { <main class="initial"><h1>Loading portfolio workspace…</h1>@if (error()) { <p role="alert">{{ error() }}</p><p>Start the Python backend with python run.py.</p> }</main> }
+
+}

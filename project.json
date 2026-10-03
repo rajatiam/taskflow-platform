@@ -1,5 +1,5 @@
 {
-  "name": "Team Taskboard",
+  "name": "Taskflow Platform",
   "skills": "Full-stack product development, REST, SQLite, filtering",
   "entity": "task",
   "fields": [
@@ -25,5 +25,7 @@
     "Docker",
     "Kubernetes",
     "GitHub Actions"
-  ]
+  ],
+  "slug": "taskflow-platform",
+  "engineering_version": "3.0.0"
 }

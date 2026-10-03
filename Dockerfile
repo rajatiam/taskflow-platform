@@ -9,7 +9,8 @@ FROM python:3.13-slim
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py api.py domain.py run.py project.json ./
+COPY app.py api.py run.py manage.py project.json ./
+COPY backend ./backend
 COPY --from=frontend /build/dist/portfolio/browser ./frontend/dist/portfolio/browser
 RUN useradd --uid 10001 --create-home appuser && mkdir /app/data && chown appuser /app/data
 USER appuser

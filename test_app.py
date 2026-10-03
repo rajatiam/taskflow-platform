@@ -1,6 +1,6 @@
 import unittest, tempfile
 from pathlib import Path
-from fastapi.testclient import TestClient
+from tests.helpers import AuthorizedClient as TestClient
 import app
 import api
 
