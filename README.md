@@ -1,4 +1,4 @@
-# Team Taskboard â€” Python + Angular
+# Team Taskboard — Python + Angular
 
 Organize team work with a live Kanban board and clear ownership.
 
@@ -53,7 +53,7 @@ The multi-stage Docker build compiles Angular, installs Python dependencies, and
 
 ## Features
 
-Create tasks, assign owners, and advance todo â†’ doing â†’ done. The Angular UI renders a three-column Kanban board.
+Create tasks, assign owners, and advance todo → doing → done. The Angular UI renders a three-column Kanban board.
 
 - Responsive Angular dashboard with typed HttpClient service and standalone components.
 - Signal-driven UI, reactive forms, debounced search, and cancellable search requests.
