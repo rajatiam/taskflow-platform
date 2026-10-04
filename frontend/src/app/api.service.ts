@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { forkJoin, retry, tap, throwError, timer } from 'rxjs';
+import { forkJoin, retry, map, tap, throwError, timer } from 'rxjs';
 import { ProjectConfig, RecordItem } from './models';
 
 @Injectable({providedIn:'root'})
@@ -8,10 +8,11 @@ export class ApiService {
   private readonly http=inject(HttpClient);
   private readonly versions=new Map<number,number>();
   config() { return this.http.get<ProjectConfig>('/api/config'); }
-  workspace(query: string) {
+  workspace(query: string, offset = 0) {
     const options={params:{q:query}};
-    return forkJoin({records:this.http.get<RecordItem[]>('/api/records',options),summary:this.http.get<Record<string,unknown>>('/api/summary',options)}).pipe(tap(data => { for (const row of data.records) this.versions.set(row.id,row.version); }));
+    return forkJoin({page:this.http.get<{items:RecordItem[];total:number}>('/api/v1/records',{params:{q:query,limit:50,offset}}),summary:this.http.get<Record<string,unknown>>('/api/summary',options)}).pipe(map(data=>({records:data.page.items,total:data.page.total,summary:data.summary})),tap(data => { for (const row of data.records) this.versions.set(row.id,row.version); }));
   }
+  export(query:string,format:string){return this.http.get('/api/exports/records',{params:{q:query,format},responseType:'blob'});}
   create(data: Record<string,unknown>) {
     // The same key survives transient retries: the backend stores one result.
     const key=crypto.randomUUID();

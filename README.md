@@ -41,6 +41,7 @@ For Angular live reload, run `npm start` in `frontend/` alongside the Python ser
 ```sh
 python -m unittest -v
 docker compose config
+docker compose run --rm --build app python manage.py create-admin --username local-admin
 docker compose up --build
 ```
 
@@ -61,3 +62,7 @@ Business fields are separate from server metadata: `id`, `version` (integer revi
 ## Scope
 
 This is an engineering portfolio reference application. It demonstrates implemented design choices and failure handling; it does not claim live customer traffic or a production operating history. Deployment uses one workspace and one SQLite writer. See the documented tradeoffs and hardening work in the architecture and runbook.
+
+## Workspace enhancements
+
+The workspace pages through 50 records at a time and exports the current filter as JSON or CSV. Exports include active records only and are bounded to 5000 rows; CSV formula-like cells are neutralized. Administrators can browse archived records and restore their original ID and workflow state. Restoration requires the current revision, commits an audit event atomically, and rejects conflicting active identities or bookings.

@@ -1,6 +1,6 @@
 import { AuthService } from './auth.service';
 import { AuthPanelComponent } from './auth-panel.component';
-import { AuditPanelComponent, MembersPanelComponent } from './admin-panels.component';
+import { AuditPanelComponent, MembersPanelComponent, ArchivePanelComponent } from './admin-panels.component';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -13,7 +13,7 @@ import { Field, ProjectConfig, RecordItem, Value } from './models';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, AuthPanelComponent, AuditPanelComponent, MembersPanelComponent],
+  imports: [CommonModule, ReactiveFormsModule, AuthPanelComponent, AuditPanelComponent, MembersPanelComponent, ArchivePanelComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit {
@@ -30,10 +30,13 @@ export class AppComponent implements OnInit {
   readonly notice = signal('');
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly tab = signal<'workspace' | 'analytics' | 'architecture' | 'audit' | 'members'>('workspace');
+  readonly tab = signal<'workspace' | 'analytics' | 'architecture' | 'audit' | 'members' | 'archives'>('workspace');
   readonly pendingDelete = signal<number | null>(null);
   readonly selected = signal<RecordItem | null>(null);
   readonly query = signal('');
+  readonly offset=signal(0); readonly total=signal(0);
+  page(direction:number){this.offset.update(value=>Math.max(0,value+direction*50));this.refresh();}
+  export(format:string){this.api.export(this.query(),format).subscribe({next:blob=>{const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=document.title.replaceAll(' ','-')+'.'+format;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);},error:error=>this.fail(error)});}
   readonly fields = signal<Field[]>([]);
   readonly metrics = computed(() => Object.entries(this.stats()).filter(([,v]) => typeof v === 'number').map(([label,value]) => ({label: label.replaceAll('_',' '),value:Number(value)})));
   readonly columns = ['todo','doing','done'];
@@ -60,7 +63,7 @@ export class AppComponent implements OnInit {
         if (config.kind === 'jobs') timer(2000,2000).pipe(takeUntilDestroyed(this.destroy)).subscribe(() => { if (!this.saving()) this.refresh(false); });
       }, error: error => this.fail(error)
     });
-    this.searchEvents.pipe(debounceTime(250), distinctUntilChanged(), switchMap(query => this.api.workspace(query).pipe(catchError(error => { this.fail(error); return of(null); }))), takeUntilDestroyed(this.destroy)).subscribe(data => { if (data) { this.rows.set(data.records); this.stats.set(data.summary); } });
+    this.searchEvents.pipe(debounceTime(250), distinctUntilChanged(), switchMap(query => this.api.workspace(query).pipe(catchError(error => { this.fail(error); return of(null); }))), takeUntilDestroyed(this.destroy)).subscribe(data => { if (data) { this.rows.set(data.records); this.total.set(data.total); this.stats.set(data.summary); } });
   }
 
   private options(kind: string, key: string, value: Value): string[] {
@@ -73,9 +76,9 @@ export class AppComponent implements OnInit {
   }
   refresh(showLoading = true) {
     if (showLoading) this.loading.set(true);
-    this.api.workspace(this.query()).pipe(takeUntilDestroyed(this.destroy)).subscribe({ next: data => { this.rows.set(data.records); this.stats.set(data.summary); this.loading.set(false); }, error: error => this.fail(error) });
+    this.api.workspace(this.query(),this.offset()).pipe(takeUntilDestroyed(this.destroy)).subscribe({ next: data => { this.rows.set(data.records); this.total.set(data.total); this.stats.set(data.summary); this.loading.set(false); }, error: error => this.fail(error) });
   }
-  search(value: string) { this.query.set(value); this.searchEvents.next(value); }
+  search(value: string) { this.offset.set(0); this.query.set(value); this.searchEvents.next(value); }
   create() {
     if (this.form.invalid || this.saving()) { this.form.markAllAsTouched(); return; }
     const data = this.form.getRawValue();
@@ -84,7 +87,7 @@ export class AppComponent implements OnInit {
       if (typeof example === 'number') data[key] = Number(data[key]);
     }
     this.saving.set(true); this.error.set('');
-    this.api.create(data).pipe(takeUntilDestroyed(this.destroy)).subscribe({ next: () => { this.saving.set(false); this.notice.set('Record created successfully.'); this.refresh(); }, error: error => this.fail(error) });
+    this.api.create(data).pipe(takeUntilDestroyed(this.destroy)).subscribe({ next: () => { this.saving.set(false); this.notice.set('Record created successfully.'); this.offset.set(0); this.refresh(); }, error: error => this.fail(error) });
   }
   action(row: RecordItem, name: string) {
     this.saving.set(true); this.error.set('');

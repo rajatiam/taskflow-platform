@@ -22,3 +22,9 @@ The compatible `/api/records` list accepts `q`, `limit` and `offset`; the versio
 For a mutation, send the current record revision, for example `If-Match: "1"`, and the readable CSRF cookie value as `X-CSRF-Token`. Angular supplies both. A create can include a stable 8–128 character Idempotency-Key. Retrying with the same user, key and input returns the original record.
 
 Errors include `error`, `code` and `request_id`. Relevant statuses: 401 session missing/expired, 403 role/CSRF/origin violation, 404 absent record, 409 stale revision or duplicate/idempotency conflict, 413 oversized body, 422 invalid input, 428 missing If-Match, 429 failed-login throttle. Successful responses include X-Request-ID; record reads and mutations include ETag.
+
+## Recovery and export
+
+- GET /api/admin/archives: administrator-only paginated archive list.
+- POST /api/admin/archives/{id}/restore: administrator + CSRF + If-Match; restore without recreating workflow history.
+- GET /api/exports/records?format=json|csv&q=...: authenticated filtered export, maximum 5000 active records. Narrow larger searches.

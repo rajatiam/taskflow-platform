@@ -8,7 +8,7 @@
       <button [class.active]="tab() === 'workspace'" (click)="tab.set('workspace')">Workspace</button>
       <button [class.active]="tab() === 'analytics'" (click)="tab.set('analytics')">Analytics</button>
       <button [class.active]="tab() === 'architecture'" (click)="tab.set('architecture')">Architecture</button>
-    @if (auth.isAdmin()) { <button [class.active]="tab() === 'audit'" (click)="tab.set('audit')">Audit history</button><button [class.active]="tab() === 'members'" (click)="tab.set('members')">Access control</button> }
+    @if (auth.isAdmin()) { <button [class.active]="tab() === 'audit'" (click)="tab.set('audit')">Audit history</button><button [class.active]="tab() === 'members'" (click)="tab.set('members')">Access control</button><button (click)="tab.set('archives')">Archives</button> }
     </nav>
     <div class="sidebar-footer"><span class="status-dot"></span> LOCAL DEVELOPMENT<br><small>FastAPI · SQLite · Docker</small></div>
   </aside>
@@ -18,6 +18,7 @@
     @if (notice()) { <div class="alert success" role="status">{{ notice() }} <button (click)="notice.set('')" aria-label="Dismiss notice">×</button></div> }
     <div class="metrics">@for (metric of metrics(); track metric.label) { <article class="metric"><span>{{ metric.label }}</span><strong>{{ metric.value | number:'1.0-2' }}</strong></article> } @empty { <article class="metric"><span>Records</span><strong>{{ rows().length }}</strong></article> }</div>
     @if (tab() === 'workspace') {
+      <div class="actions"><button (click)="page(-1)" [disabled]="offset()===0">Previous records</button><span>{{total()}} matching records</span><button (click)="page(1)" [disabled]="offset()+rows().length>=total()">Next records</button><button (click)="export('json')">Export JSON</button><button (click)="export('csv')">Export CSV</button></div>
       <div class="workspace">
         <section class="panel create-panel"><div class="panel-heading"><h2>New {{ config.entity }}</h2><span class="pill">CREATE</span></div>
           @if (auth.canWrite()) { <form [formGroup]="form" (ngSubmit)="create()">
@@ -62,6 +63,7 @@ Result: {{ text(row,'result') }}</pre>@if (row['error']) { <p class="validation"
     }
     @if (tab() === 'analytics') { <section class="panel"><h2>Operational analytics</h2><p class="muted">Metrics reflect the current search filter and persisted workspace.</p><pre class="output">{{ stats() | json }}</pre></section> }
     @if (tab() === 'architecture') { <section class="panel architecture"><h2>How this project works</h2><div class="flow"><span>Angular UI</span>→<span>FastAPI</span>→<span>Domain rules</span>→<span>SQLite</span></div><h3>Skills demonstrated</h3><p>{{ config.skills }}</p><h3>Local infrastructure</h3><p>Docker multi-stage builds compile Angular and package the Python backend. CI runs Python tests, compiles Angular, and builds the image. Kubernetes templates include persistent storage, health probes, and resource limits.</p><h3>Demo scope</h3><p>This local portfolio reference app uses one backend process. Cloud cost, policy, and release tools use local data. Sessions and role checks protect mutations. Configure TLS and production settings before public hosting.</p></section> }
+    @if (tab() === 'archives' && auth.isAdmin()) { <app-archive-panel (restored)="refresh()" /> }
     @if (tab() === 'audit' && auth.isAdmin()) { <app-audit-panel /> }
     @if (tab() === 'members' && auth.isAdmin()) { <app-members-panel /> }
     <footer>Built with Angular + FastAPI <span>Persistent local workspace</span></footer>

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -28,4 +28,19 @@ export class MembersPanelComponent implements OnInit {
   ngOnInit(){this.load();}
   load(){this.http.get<User[]>('/api/admin/users').subscribe({next:users=>this.users.set(users),error:error=>this.error.set(error.error?.error??'Could not load members')});}
   change(id:number,role:string){this.http.patch<User>(`/api/admin/users/${id}/role`,{role}).subscribe({next:()=>{this.error.set('');this.load();},error:error=>{this.error.set(error.error?.error??'Role change failed');this.load();}});}
+}
+
+@Component({selector:'app-archive-panel',standalone:true,imports:[CommonModule],template:`
+<section class="panel"><div class="panel-heading"><h2>Archived records</h2><button (click)="load()">Refresh archives</button></div>
+<p class="muted">Restore keeps the original ID and workflow history. Conflicting active identities and reservations must be resolved first.</p>
+@if(error()){<p role="alert" class="validation">{{error()}}</p>}
+@for(row of rows();track row.id){<article class="record"><h3>Record #{{row.id}}</h3><p>Archived {{$any(row['deleted_at']) | date:'medium'}} · Revision {{row.version}}</p><pre class="output">{{row | json}}</pre><button [disabled]="busy()" (click)="restore(row)">Restore record</button></article>}
+@if(!rows().length){<p>No archived records on this page.</p>}
+<div class="actions"><button (click)="page(-1)" [disabled]="offset()===0">Previous archives</button><span>{{total()}} archived</span><button (click)="page(1)" [disabled]="offset()+rows().length>=total()">Next archives</button></div></section>`})
+export class ArchivePanelComponent implements OnInit {
+ readonly restored=output<void>();private readonly http=inject(HttpClient);readonly rows=signal<import('./models').RecordItem[]>([]);readonly total=signal(0);readonly offset=signal(0);readonly error=signal('');readonly busy=signal(false);
+ ngOnInit(){this.load();}
+ load(){this.http.get<{items:import('./models').RecordItem[];total:number}>('/api/admin/archives',{params:{limit:20,offset:this.offset()}}).subscribe({next:data=>{this.rows.set(data.items);this.total.set(data.total);},error:error=>this.error.set(error.error?.error??'Could not load archives')});}
+ page(direction:number){this.offset.update(value=>Math.max(0,value+direction*20));this.load();}
+ restore(row:import('./models').RecordItem){if(this.busy())return;this.busy.set(true);this.error.set('');this.http.post(`/api/admin/archives/${row.id}/restore`,{},{headers:{'If-Match':String(row.version)}}).subscribe({next:()=>{this.busy.set(false);this.load();this.restored.emit();},error:error=>{this.busy.set(false);this.error.set(error.error?.error??'Could not restore record');}});}
 }

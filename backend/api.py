@@ -30,7 +30,7 @@ async def lifespan(application):
     STOP.set()
     if thread: thread.join(timeout=5)
 
-app=FastAPI(title=store.CONFIG['name'],version='3.0.0',lifespan=lifespan)
+app=FastAPI(title=store.CONFIG['name'],version='3.1.0',lifespan=lifespan)
 
 @app.middleware('http')
 async def boundaries(request: Request,call_next):
@@ -161,6 +161,23 @@ def users(user=Depends(administrator)):
 @app.patch('/api/admin/users/{key}/role',tags=['administration'])
 def role(key: int,data: RoleChange,request: Request,user=Depends(administrator)):
     return security.change_role(store.DB,key,data.role,user,request.state.request_id)
+
+
+@app.get('/api/admin/archives',tags=['administration'])
+def archives(limit: int=Query(50,ge=1,le=200),offset: int=Query(0,ge=0),user=Depends(administrator)):
+    return resources().archives(limit,offset)
+
+@app.post('/api/admin/archives/{key}/restore',response_model=RecordOut,tags=['administration'])
+def restore(key: int,request: Request,response: Response,user=Depends(administrator)):
+    row=resources().restore(key,user,request.headers.get('If-Match'),request.state.request_id)
+    response.headers['ETag']=f'"{row["version"]}"'; return row
+
+@app.get('/api/exports/records',tags=['exports'])
+def export_records(format: str=Query('json',pattern='^(json|csv)$'),q: str='',user=Depends(current_user)):
+    from .exports import render
+    page=resources().list(q,5001,0)
+    if page['total']>5000: raise HTTPException(status_code=413,detail='Export is limited to 5000 records; narrow the search')
+    return Response(render(page['items'],format),media_type='application/json' if format=='json' else 'text/csv; charset=utf-8',headers={'Content-Disposition':f'attachment; filename="{store.CONFIG["slug"]}.{format}"'})
 
 # Custom project routes are injected here before the Angular static mount.
 
